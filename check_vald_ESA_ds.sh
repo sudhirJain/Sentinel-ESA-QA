@@ -5,7 +5,8 @@
 # Author      :  Sudhir Jain
 # Date        :  June 29 2015
 # Description : Script verifies the ESA datasets for RAW, SLC, GRD and OCN put the
-#               verified datasets to RDSI Repository.
+#               verified datasets to RDSI Repository.  This scrips is maintains QA/QC for
+#               ESA datasets
 # Revision:
 #               OCN data transfer has been added to the system. ( 21 JLY  2015 )
 #               Datasets are moved to current directory and verification failed
