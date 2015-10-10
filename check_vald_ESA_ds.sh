@@ -22,9 +22,19 @@
 
 echo "Starting Script ..."
 
-ds_path="/g/data/v10/sentinel_hub_download/RDSI_CACHE/"
-ds_path_failed="/g/data/v10/sentinel_hub_download/PRODUCT_FAILED"
-dest_ds_p="/g/data/fj7/SAR/Sentinel-1/"
+#-----------------------------------------------------------------------------------------
+# Repository for data collection ( user selectable )
+#-----------------------------------------------------------------------------------------
+ds_path=""
+#-----------------------------------------------------------------------------------------
+# Repository for moving QA/QC failed datasets ( user selectable )
+#-----------------------------------------------------------------------------------------
+ds_path_failed=""
+#-----------------------------------------------------------------------------------------
+# Repository Node for QA/QC passed datasets ( user selectable )
+#-----------------------------------------------------------------------------------------
+dest_ds_p=""
+#-----------------------------------------------------------------------------------------
 
 display_usage() {
    echo "Usage: ./check_valid_ds.sh  text file "
