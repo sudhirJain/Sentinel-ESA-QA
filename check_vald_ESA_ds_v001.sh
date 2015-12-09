@@ -5,8 +5,7 @@
 # Author      :  Sudhir Jain
 # Date        :  June 29 2015
 # Description : Script verifies the ESA datasets for RAW, SLC, GRD and OCN put the
-#               verified datasets to RDSI Repository.  This scrips is maintains QA/QC for
-#               ESA datasets
+#               verified datasets to RDSI Repository.
 # Revision:
 #               OCN data transfer has been added to the system. ( 21 JLY  2015 )
 #               Datasets are moved to current directory and verification failed
@@ -15,26 +14,21 @@
 # Date         : Aug 18, 2015
 # Description  : Checking a file locked in I/O operation
 #
-#                ** Repository paths are user selectable **
+# Date         : Dec 4, 2015
+# Description  : Quality Check for Sentinel-2 MSIL1C datasets have been included and
+#                a new function has been added to transfer the validated datasets to
+#                MSIL1C repositories.
+#
 #-----------------------------------------------------------------------------------------
 #-----------------------------------------------------------------------------------------
 
 
 echo "Starting Script ..."
 
-#-----------------------------------------------------------------------------------------
-# Repository for data collection ( user selectable )
-#-----------------------------------------------------------------------------------------
-ds_path=""
-#-----------------------------------------------------------------------------------------
-# Repository for moving QA/QC failed datasets ( user selectable )
-#-----------------------------------------------------------------------------------------
-ds_path_failed=""
-#-----------------------------------------------------------------------------------------
-# Repository Node for QA/QC passed datasets ( user selectable )
-#-----------------------------------------------------------------------------------------
-dest_ds_p=""
-#-----------------------------------------------------------------------------------------
+ds_path="/g/data/v10/sentinel_hub_download/RDSI_CACHE/"
+ds_path_failed="/g/data/v10/sentinel_hub_download/PRODUCT_FAILED"
+dest_ds_p="/g/data/fj7/SAR/Sentinel-1/"
+dest_ds_q="/g/data/fj7/MSI/Sentinel-2/"
 
 display_usage() {
    echo "Usage: ./check_valid_ds.sh  text file "
@@ -81,15 +75,24 @@ display_counter() {
     fi
 }
 
+display_counter() {
+
+    echo "Dataset Count                  = $counter"
+    echo "Total Dataset Count            = $total_count"
+    echo "Total Dataset Record Count     = $rcount"
+    echo "------------------------------------------------------------"
+
+    if [ $rcount -ge $total_count ]
+       then
+         exit 1
+    fi
+}
 
 #-----------------------------------------------------------------------------------------
+#  Check for Sentinel 1
 #-----------------------------------------------------------------------------------------
 
-counter=0
-rcount=0
-total_count=`cat $1|wc -l`
-while read line
-do
+process_sentinel_1 () {
 
         if [[ $line =~ "SLC" ]]
         then
@@ -105,7 +108,7 @@ do
             d_type="OCN"
         fi
 
-        echo "ds_type = $d_type "
+        echo "Sentinel-1 ds_type = $d_type "
 
         rdsi_folder=${line:17:4}-${line:21:2}
         dest_ds_p_1=$dest_ds_p$d_type/$rdsi_folder
@@ -222,5 +225,113 @@ do
         rm -rvf $line.SAFE
 
         display_counter
+
+}
+
+#-----------------------------------------------------------------------------------------
+#  Check for Sentinel 2
+#----------------------------------------------------------------------------------------
+
+process_sentinel_2 () {
+
+        if [[ $line =~ "MSIL1C" ]]
+        then
+            d_type="L1C"
+        fi
+        echo "Sentinel-2 ds_type = $d_type "
+
+        rdsi_folder=${line:25:4}-${line:29:2}
+        dest_ds_p_1=$dest_ds_q$d_type/$rdsi_folder
+
+        echo "RDSI folder = $dest_ds_p_1"
+        echo "-------------------------------------------"
+        rcount=$((rcount+1))
+
+        if [ ! -d $dest_ds_p_1 ]
+        then
+                echo "Directory $$dest_ds_p_1 not existing "
+                exit 1
+        fi
+
+#       Checking the file locked in I/O operation
+
+        var=$(/usr/sbin/lsof $ds_path/$line)
+        if [ ! -z "$var" ]
+        then
+            echo "File $line Locked in I/O Operation"
+            continue
+        fi
+
+        if  [ -f $dest_ds_p_1/$line.zip ]
+        then
+                echo "File Exist"
+                counter=$((counter+1))
+                display_counter
+                continue
+        else
+                echo "File not existing "
+        fi
+
+        echo $ds_path/$line
+#       rsync -aP  $ds_path/$line .
+
+#       Moving the file to current directory
+
+        mv $ds_path/$line .
+
+        echo "UNziping  $line"
+        if ! unzip $line &> /dev/null; then
+                echo "Invalid dataset file"
+                echo "$line" >> non_processed_ds_$d_type.txt
+                mv $line $ds_path_failed/
+        else
+            echo "Line = $line after zipping ..."
+            if [[ $line =~ "MSIL1C" ]]
+            then
+
+                files=(line.SAFE/GRANULE/*.00)
+                if [[ "${#files[@]}" -gt 0 ]]
+                then
+
+                   counter=$((counter+1))
+                   echo "GRANULE exist for $line" >>  processed_ds_$d_type.txt
+                   mv $line $dest_ds_p_1/$line.zip
+                   chmod 777 $dest_ds_p_1/$line.zip
+                   chown -R ssj547:fj7 $dest_ds_p_1/$line.zip
+                   echo "$line" > ds_last_prcoessed_$d_type.txt
+                else
+                   echo "Invalid dataset file $line"
+                   echo "$line" >> non_processed_ds_$d_type.txt
+                   mv $line $ds_path_failed/
+                fi
+            fi
+        fi
+
+        if [ -f $line ]
+        then
+           rm -rvf $line
+        fi
+        rm -rvf $line.SAFE
+
+        display_counter
+
+}
+
+
+#-----------------------------------------------------------------------------------------
+#-----------------------------------------------------------------------------------------
+
+counter=0
+rcount=0
+total_count=`cat $1|wc -l`
+while read line
+do
+    if [[ $line =~ "S1A" ]]
+    then
+           process_sentinel_1
+    elif [[ $line =~ "S2A" ]]
+        then
+           process_sentinel_2
+    fi
 
 done < $1
